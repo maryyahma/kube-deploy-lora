@@ -11,8 +11,10 @@ spec:
     storage: 5Gi
   accessModes:
     - ReadWriteMany
-  hostPath:
-    path: "/postgres_data/"     
+  glusterfs:
+    endpoints: postgre-gluster
+    path: /postgre_volume
+    readOnly: false      
   persistentVolumeReclaimPolicy: Retain    
 ---
 kind: PersistentVolumeClaim
@@ -43,8 +45,10 @@ spec:
     storage: 5Gi
   accessModes:
     - ReadWriteMany
-  hostPath:
-    path: "/postgres_init/" 
+  glusterfs:
+    endpoints: postgre-gluster
+    path: /postgre_volume
+    readOnly: false
   persistentVolumeReclaimPolicy: Retain
 ---
 kind: PersistentVolumeClaim

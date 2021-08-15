@@ -7,7 +7,7 @@ import argparse
 from influxdb import InfluxDBClient
 from datetime import datetime
 
-from parser.smart_water import smart_water
+from parser.DecodeRAK7204 import DecodeRAK7204
 from parser.people_counter import people_counter
 from parser.wind import wind
 from parser.traffic_counter import traffic_counter
@@ -18,6 +18,8 @@ devEUI_file = 'conf/devEUI.json'
 with open(devEUI_file) as f:
   devEUI_dict = json.load(f)
 
+
+
 location_file = 'conf/location.json'
 with open(location_file) as f:
   location_dict = json.load(f)
@@ -25,16 +27,20 @@ with open(location_file) as f:
 def get_sensor_type(devEUI):
     sensor_type = None
     for key, value in devEUI_dict.items():
-        if devEUI in value:
+        if devEUI == value:
             sensor_type = key
+            print("INFO:sensor type", sensor_type)
             break
     return sensor_type
 
 def get_sensor_location(devEUI):
+    print(devEUI)
     sensor_location = None
     for key, value in location_dict.items():
+        #print(key, value)
         if key == devEUI:
             sensor_location = value
+            print(key, value)
             break
     return sensor_location
 
@@ -45,34 +51,37 @@ def data_parser(payload_dict):
 
     sensor_location = get_sensor_location(devEUI)
     sensor_type = get_sensor_type(devEUI)
-    # print(sensor_type)
+    print(sensor_type)
 
     #TODO: define the topic
-    if sensor_location != None: 
+    if sensor_location != None:
         topic = sensor_type + "/" + sensor_location
+        print("INFO:topic", topic)
     else:
         print("WARNING: The sensor is not included yet")
         return None, None, None
-    
+
     mqtt_message['SensorID'] = devEUI
-    
+
     if 'data' not in payload_dict.keys():
         print('WARNING: No data in sensor data')
         return None, None, None
 
     data = payload_dict['data']
+    print("INFO: Here is the data...", data)
     data_hex = base64.b64decode(data).hex()
+    print("INFO: Hexadecimal data after base64 decoded ....", data_hex)
 
-    if sensor_type == 'smart_water':
-        protocol_file = './parser/smart_water.csv'
-        mqtt_dict = smart_water(data_hex, protocol_file)
-    elif sensor_type == 'smart_water_lon':
-        protocol_file = './parser/smart_water_lon.csv'
-        mqtt_dict = smart_water(data_hex, protocol_file)  
-    elif sensor_type == 'outdoor_env':
-        protocol_file = './parser/outdoor_env.csv'
-        mqtt_dict = smart_water(data_hex, protocol_file)          
-    elif sensor_type == 'people_counter':
+    #if sensor_type == 'smart_water':
+        #protocol_file = './parser/smart_water.csv'
+        #mqtt_dict = smart_water(data_hex, protocol_file)
+    #elif sensor_type == 'smart_water_lon':
+        #protocol_file = './parser/smart_water_lon.csv'
+        #mqtt_dict = smart_water(data_hex, protocol_file)
+    #if sensor_type == 'outdoor_env':
+        #protocol_file = './parser/outdoor_env.csv'
+        #mqtt_dict = smart_water(data_hex, protocol_file)
+    if sensor_type == 'people_counter':
         mqtt_dict = people_counter(data_hex)
     elif sensor_type == 'wind':
         mqtt_dict = wind(data_hex)
@@ -80,9 +89,13 @@ def data_parser(payload_dict):
         mqtt_dict = traffic_counter(data_hex)
     elif sensor_type == "indoor_env":
         mqtt_dict = indoor_env(data_hex)
+    elif sensor_type == "DecodeRAK7204":
+        mqtt_dict = DecodeRAK7204(data_hex)
+
+    print("INFO: Data after being parsed by parser ....", mqtt_dict)
 
     mqtt_message['SensorData'] = mqtt_dict
-    
+
 
     # Create point for updating influxdb
     influxdb_dict = {}
@@ -94,9 +107,9 @@ def data_parser(payload_dict):
     influxdb_dict["time"] = now_ISO8601
     tags_dict["topic"] = topic
     influxdb_dict["tags"] = tags_dict
-    influxdb_dict["fields"] = mqtt_dict    
+    influxdb_dict["fields"] = mqtt_dict
 
-    # print(topic, mqtt_message, influxdb_dict)
+    print(topic, mqtt_message, influxdb_dict)
     return topic, mqtt_message, influxdb_dict
 
 def influxdb_update(influxdb_server, influxdb_dict):
@@ -108,17 +121,17 @@ def influxdb_update(influxdb_server, influxdb_dict):
 
     # print(host, port, user, password)
     client = InfluxDBClient(host, port, user, password, dbname)
-    
+
     dbs = client.get_list_database()
-    
+
     if dbname not in dbs:
         client.create_database(dbname)
-        
+
     points = []
     points.append(influxdb_dict)
     print("INFO: Write points: {0}".format(points))
     client.write_points(points)
-    
+
 
 # This is the Subscriber
 def on_connect(client, userdata, flags, rc):
@@ -131,28 +144,26 @@ def on_message(client, userdata, msg):
     print("INFO: Raw data ", payload_dict)
 
     topic, mqtt_message, influxdb_dict = data_parser(payload_dict)
-    
-    
 
-    if topic is not None and mqtt_message is not None and bool(mqtt_message['SensorData']): 
+    if topic is not None and mqtt_message is not None and bool(mqtt_message['SensorData']):
         mqtt_message_string = json.dumps(mqtt_message, ensure_ascii=False)
-    
+
         print("INFO: Parsed data", topic, mqtt_message_string)
         client.publish(topic, mqtt_message_string)
-        
+
         if local_influxdb != 'disable' :
             print("INFO: Update influxdb in fog")
             influxdb_update(local_influxdb, influxdb_dict)
-        
-        if central_influxdb != 'disable':
-            print("INFO: Update influxdb in cloud")
-            influxdb_update(central_influxdb, influxdb_dict)
+
+        #if central_influxdb != 'disable':
+            #print("INFO: Update influxdb in cloud")
+            #influxdb_update(central_influxdb, influxdb_dict)
 
     else:
         print("WARNING: Sensor data is wrong")
-        
-        
-        
+
+
+
 
 if __name__ == '__main__':
 
@@ -164,24 +175,24 @@ if __name__ == '__main__':
     parser.add_argument('local_influxdb', type=str,
                         help = 'the ip address of influxdb in a fog cluster')
 
-    parser.add_argument('central_influxdb', type=str, 
-                        help='the ip address of central influxdb')
-    
+    #parser.add_argument('central_influxdb', type=str,
+                        #help='the ip address of central influxdb')
+
     args = parser.parse_args()
-    
-    global mqtt_server, local_influxdb, central_influxdb
+
+    global mqtt_server, local_influxdb
     mqtt_server = args.mqtt_server
     local_influxdb = args.local_influxdb
-    central_influxdb = args.central_influxdb
-    
-    print("INFO: Settings ", mqtt_server, local_influxdb, central_influxdb)
-    
+    #central_influxdb = args.central_influxdb
+
+    print("INFO: Settings ", mqtt_server, local_influxdb)
+
 
     client = mqtt.Client()
     client.username_pw_set(username="fogguru",password="FogGuru2020")
     client.connect(mqtt_server)
-    
+
     client.on_connect = on_connect
     client.on_message = on_message
-    
+
     client.loop_forever()

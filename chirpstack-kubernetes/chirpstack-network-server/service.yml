@@ -18,4 +18,4 @@ spec:
   selector:
     app: chirpstack-network-server
   externalIPs:
-  - $myclusterIP
+  - 131.254.150.144

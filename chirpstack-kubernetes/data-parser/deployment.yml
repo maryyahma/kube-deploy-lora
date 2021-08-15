@@ -16,11 +16,11 @@ spec:
     spec:
       containers:
       - name: data-parser
-        image: lillywu/data-parser:v6
+        image: maryyahma/data-parser
         env:
         - name: MQTT_SERVER
           value: mosquitto
         - name: LOCAL_INFLUXDB
           value: influx
-        - name: CENTRAL_INFLUXDB
-          value: "192.168.9.71"
+       # - name: CENTRAL_INFLUXDB
+         # value: "192.168.9.71"
