@@ -12,4 +12,4 @@ spec:
   selector:
     app: nodered
   externalIPs:
-  - $myclusterIP
+  - 131.254.150.144

@@ -13,4 +13,4 @@ spec:
   selector:
     app: mosquitto
   externalIPs: #change the following Ip address according to your master node IP
-  - $myclusterIP
+  - 131.254.150.144
